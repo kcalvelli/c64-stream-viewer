@@ -169,9 +169,11 @@ class AudioPlayer:
     """Handles audio playback with buffering using PyAudio"""
 
     def __init__(self):
-        self.audio_queue = queue.Queue(maxsize=20)
+        self.audio_queue = queue.Queue(maxsize=40)  # Increased from 20 for better buffering
         self.running = True
         self.packets_played = 0
+        self.last_seq = None
+        self.dropped_packets = 0
 
         if PYAUDIO_AVAILABLE:
             # Use PyAudio for better sample rate handling
@@ -184,7 +186,7 @@ class AudioPlayer:
                 channels=2,
                 rate=AUDIO_SAMPLE_RATE,  # Use exact 47976 Hz
                 output=True,
-                frames_per_buffer=192  # Exact packet size
+                frames_per_buffer=512  # Increased from 192 for smoother playback
             )
             print(f"Audio initialized (PyAudio): {AUDIO_SAMPLE_RATE} Hz, 16-bit stereo")
         else:
@@ -198,8 +200,18 @@ class AudioPlayer:
         self.thread = threading.Thread(target=self._play_audio, daemon=True)
         self.thread.start()
 
-    def add_audio_packet(self, audio_data):
-        """Add audio packet to playback queue"""
+    def add_audio_packet(self, audio_data, seq_num=None):
+        """Add audio packet to playback queue and track sequence"""
+        # Track packet loss
+        if seq_num is not None and self.last_seq is not None:
+            expected_seq = (self.last_seq + 1) & 0xFFFF
+            if seq_num != expected_seq:
+                dropped = (seq_num - expected_seq) & 0xFFFF
+                self.dropped_packets += dropped
+
+        if seq_num is not None:
+            self.last_seq = seq_num
+
         try:
             self.audio_queue.put_nowait(audio_data)
         except queue.Full:
@@ -459,9 +471,11 @@ def main():
                         data, addr = audio_sock.recvfrom(AUDIO_PACKET_SIZE + 100)
 
                         if len(data) == AUDIO_PACKET_SIZE:
-                            # Skip 2-byte header, get 768 bytes of audio
+                            # Extract sequence number from 2-byte header (little-endian)
+                            seq_num = struct.unpack('<H', data[0:2])[0]
+                            # Get 768 bytes of audio samples
                             audio_data = data[AUDIO_HEADER_SIZE:AUDIO_HEADER_SIZE + 768]
-                            audio_player.add_audio_packet(audio_data)
+                            audio_player.add_audio_packet(audio_data, seq_num)
                             audio_count += 1
 
                         audio_packets_processed += 1
@@ -477,8 +491,9 @@ def main():
             if current_time - last_stats_time >= 1.0:
                 fps = fps_counter / (current_time - last_stats_time)
                 audio_info = f" | Audio: {audio_count}" if audio_player else ""
+                drop_info = f" | Dropped: {audio_player.dropped_packets}" if audio_player and audio_player.dropped_packets > 0 else ""
                 mute_info = " (MUTED)" if audio_player and audio_muted else ""
-                print(f"FPS: {fps:.1f} | Frames: {frame_count}{audio_info}{mute_info}")
+                print(f"FPS: {fps:.1f} | Frames: {frame_count}{audio_info}{drop_info}{mute_info}")
                 fps_counter = 0
                 last_stats_time = current_time
 
@@ -487,7 +502,8 @@ def main():
     finally:
         print(f"\nTotal - Video: {frame_count} frames")
         if audio_player:
-            print(f"Total - Audio: {audio_count} packets ({audio_player.packets_played} played)")
+            drop_msg = f", {audio_player.dropped_packets} dropped" if audio_player.dropped_packets > 0 else ""
+            print(f"Total - Audio: {audio_count} packets ({audio_player.packets_played} played{drop_msg})")
             audio_player.stop()
         if video_sock:
             video_sock.close()
