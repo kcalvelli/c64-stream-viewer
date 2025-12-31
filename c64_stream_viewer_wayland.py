@@ -141,7 +141,7 @@ def main():
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind(('0.0.0.0', args.port))
-        sock.settimeout(0.001)  # 1ms timeout for non-blocking
+        sock.setblocking(False)  # Non-blocking mode
     except Exception as e:
         print(f"Failed to create socket: {e}")
         return 1
@@ -253,8 +253,11 @@ def main():
                     # Reset for next frame
                     assembler = C64FrameAssembler()
 
-            except socket.timeout:
+            except (BlockingIOError, OSError):
                 pass
+
+            # Small delay to prevent CPU spinning
+            time.sleep(0.001)
 
     except KeyboardInterrupt:
         print("\nStopped by user")

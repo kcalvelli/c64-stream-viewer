@@ -187,13 +187,13 @@ def main():
         # Video socket
         video_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         video_sock.bind(('0.0.0.0', args.video_port))
-        video_sock.settimeout(0.001)
+        video_sock.setblocking(False)
 
         # Audio socket
         if not args.no_audio:
             audio_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             audio_sock.bind(('0.0.0.0', args.audio_port))
-            audio_sock.settimeout(0.001)
+            audio_sock.setblocking(False)
 
     except Exception as e:
         print(f"Failed to create sockets: {e}")
@@ -299,7 +299,7 @@ def main():
 
                             assembler = C64FrameAssembler()
 
-            except socket.timeout:
+            except (BlockingIOError, OSError):
                 pass
 
             # Receive audio packets
@@ -313,8 +313,11 @@ def main():
                         audio_player.add_audio_packet(audio_data)
                         audio_count += 1
 
-                except socket.timeout:
+                except (BlockingIOError, OSError):
                     pass
+
+            # Small delay to prevent CPU spinning
+            time.sleep(0.001)
 
             # Print stats every second
             current_time = time.time()
