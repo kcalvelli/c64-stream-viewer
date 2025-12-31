@@ -51,15 +51,19 @@ def start_ultimate64_stream(ultimate_host, stream_type, local_ip, port):
     """Start a stream on the Ultimate64"""
     try:
         url = f"http://{ultimate_host}/v1/stream/{stream_type}/start?ip={local_ip}:{port}"
-        response = requests.post(url, timeout=5)
-        if response.status_code == 200:
-            print(f"Started {stream_type} stream to {local_ip}:{port}")
+        print(f"Starting {stream_type} stream to {local_ip}:{port}...", end='', flush=True)
+        response = requests.post(url, timeout=30)  # Ultimate64 API can be very slow
+        if response.status_code == 200 or response.status_code == 204:
+            print(" OK")
             return True
         else:
-            print(f"Warning: Failed to start {stream_type} stream (HTTP {response.status_code})")
+            print(f" Failed (HTTP {response.status_code})")
             return False
+    except requests.exceptions.Timeout:
+        print(" Timeout (stream may still have started)")
+        return True  # Assume success, stream might be running
     except Exception as e:
-        print(f"Warning: Could not start {stream_type} stream: {e}")
+        print(f" Error: {e}")
         return False
 
 
@@ -67,14 +71,19 @@ def stop_ultimate64_stream(ultimate_host, stream_type):
     """Stop a stream on the Ultimate64"""
     try:
         url = f"http://{ultimate_host}/v1/stream/{stream_type}/stop"
-        response = requests.post(url, timeout=5)
-        if response.status_code == 200:
-            print(f"Stopped {stream_type} stream")
+        print(f"Stopping {stream_type} stream...", end='', flush=True)
+        response = requests.post(url, timeout=30)  # Ultimate64 API can be slow
+        if response.status_code == 200 or response.status_code == 204:
+            print(" OK")
             return True
         else:
+            print(f" Failed (HTTP {response.status_code})")
             return False
+    except requests.exceptions.Timeout:
+        print(" Timeout")
+        return True  # Assume it worked
     except Exception as e:
-        print(f"Warning: Could not stop {stream_type} stream: {e}")
+        print(f" Error: {e}")
         return False
 
 
@@ -217,7 +226,6 @@ def main():
     # Start streams on Ultimate64 if host provided
     streams_started = False
     if args.ultimate_host and not args.no_auto_stream:
-        print("Starting Ultimate64 streams...")
         video_started = start_ultimate64_stream(args.ultimate_host, 'video', args.local_ip, args.video_port)
         audio_started = False
         if not args.no_audio:
@@ -393,7 +401,7 @@ def main():
 
         # Stop streams on Ultimate64 if we started them
         if args.ultimate_host and not args.no_auto_stream and streams_started:
-            print("\nStopping Ultimate64 streams...")
+            print()
             stop_ultimate64_stream(args.ultimate_host, 'video')
             if not args.no_audio:
                 stop_ultimate64_stream(args.ultimate_host, 'audio')
