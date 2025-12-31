@@ -392,74 +392,82 @@ def main():
                             pygame.mixer.unpause()
                             print("Audio unmuted")
 
-            # Receive video packets
-            try:
-                data, addr = video_sock.recvfrom(VIDEO_PACKET_SIZE + 100)
-
-                if len(data) == VIDEO_PACKET_SIZE:
-                    # Parse header
-                    seq_num, frame_num, line_num, pixels_per_line, lines_per_packet, bits_per_pixel = \
-                        struct.unpack('<HHHHBB', data[:10])
-
-                    is_last = (line_num & 0x8000) != 0
-                    line_num = line_num & 0x7FFF
-
-                    if pixels_per_line == PIXELS_PER_LINE and lines_per_packet == LINES_PER_PACKET and bits_per_pixel == 4:
-                        pixel_data = data[VIDEO_HEADER_SIZE:]
-                        assembler.add_packet(frame_num, line_num, lines_per_packet, pixel_data, is_last)
-
-                        if assembler.is_complete():
-                            frame_surface = assembler.get_frame_surface()
-                            if frame_surface is not None:
-                                frame_count += 1
-                                fps_counter += 1
-
-                                if screen is None:
-                                    window_width = PIXELS_PER_LINE * args.scale
-                                    window_height = assembler.height * args.scale
-                                    if fullscreen:
-                                        screen = pygame.display.set_mode(
-                                            (window_width, window_height),
-                                            pygame.FULLSCREEN | pygame.SCALED
-                                        )
-                                    else:
-                                        screen = pygame.display.set_mode(
-                                            (window_width, window_height),
-                                            pygame.SCALED
-                                        )
-                                    pygame.display.set_caption('C64 Stream - A/V')
-                                    format_name = "PAL" if assembler.height == PAL_HEIGHT else "NTSC"
-                                    print(f"Format: {format_name} ({PIXELS_PER_LINE}x{assembler.height})")
-
-                                if args.scale > 1:
-                                    scaled = pygame.transform.scale(
-                                        frame_surface,
-                                        (PIXELS_PER_LINE * args.scale, assembler.height * args.scale)
-                                    )
-                                    screen.blit(scaled, (0, 0))
-                                else:
-                                    screen.blit(frame_surface, (0, 0))
-
-                                pygame.display.flip()
-
-                            assembler = C64FrameAssembler()
-
-            except (BlockingIOError, OSError):
-                pass
-
-            # Receive audio packets
-            if audio_sock and audio_player and not audio_muted:
+            # Receive video packets - drain the socket buffer
+            video_packets_processed = 0
+            while video_packets_processed < 100:  # Limit to prevent infinite loop
                 try:
-                    data, addr = audio_sock.recvfrom(AUDIO_PACKET_SIZE + 100)
+                    data, addr = video_sock.recvfrom(VIDEO_PACKET_SIZE + 100)
 
-                    if len(data) == AUDIO_PACKET_SIZE:
-                        # Skip 2-byte header, get 768 bytes of audio
-                        audio_data = data[AUDIO_HEADER_SIZE:AUDIO_HEADER_SIZE + 768]
-                        audio_player.add_audio_packet(audio_data)
-                        audio_count += 1
+                    if len(data) == VIDEO_PACKET_SIZE:
+                        # Parse header
+                        seq_num, frame_num, line_num, pixels_per_line, lines_per_packet, bits_per_pixel = \
+                            struct.unpack('<HHHHBB', data[:10])
+
+                        is_last = (line_num & 0x8000) != 0
+                        line_num = line_num & 0x7FFF
+
+                        if pixels_per_line == PIXELS_PER_LINE and lines_per_packet == LINES_PER_PACKET and bits_per_pixel == 4:
+                            pixel_data = data[VIDEO_HEADER_SIZE:]
+                            assembler.add_packet(frame_num, line_num, lines_per_packet, pixel_data, is_last)
+
+                            if assembler.is_complete():
+                                frame_surface = assembler.get_frame_surface()
+                                if frame_surface is not None:
+                                    frame_count += 1
+                                    fps_counter += 1
+
+                                    if screen is None:
+                                        window_width = PIXELS_PER_LINE * args.scale
+                                        window_height = assembler.height * args.scale
+                                        if fullscreen:
+                                            screen = pygame.display.set_mode(
+                                                (window_width, window_height),
+                                                pygame.FULLSCREEN | pygame.SCALED
+                                            )
+                                        else:
+                                            screen = pygame.display.set_mode(
+                                                (window_width, window_height),
+                                                pygame.SCALED
+                                            )
+                                        pygame.display.set_caption('C64 Stream - A/V')
+                                        format_name = "PAL" if assembler.height == PAL_HEIGHT else "NTSC"
+                                        print(f"Format: {format_name} ({PIXELS_PER_LINE}x{assembler.height})")
+
+                                    if args.scale > 1:
+                                        scaled = pygame.transform.scale(
+                                            frame_surface,
+                                            (PIXELS_PER_LINE * args.scale, assembler.height * args.scale)
+                                        )
+                                        screen.blit(scaled, (0, 0))
+                                    else:
+                                        screen.blit(frame_surface, (0, 0))
+
+                                    pygame.display.flip()
+
+                                assembler = C64FrameAssembler()
+
+                    video_packets_processed += 1
 
                 except (BlockingIOError, OSError):
-                    pass
+                    break  # No more packets available
+
+            # Receive audio packets - drain the socket buffer
+            if audio_sock and audio_player and not audio_muted:
+                audio_packets_processed = 0
+                while audio_packets_processed < 50:  # Process up to 50 audio packets per iteration
+                    try:
+                        data, addr = audio_sock.recvfrom(AUDIO_PACKET_SIZE + 100)
+
+                        if len(data) == AUDIO_PACKET_SIZE:
+                            # Skip 2-byte header, get 768 bytes of audio
+                            audio_data = data[AUDIO_HEADER_SIZE:AUDIO_HEADER_SIZE + 768]
+                            audio_player.add_audio_packet(audio_data)
+                            audio_count += 1
+
+                        audio_packets_processed += 1
+
+                    except (BlockingIOError, OSError):
+                        break  # No more packets available
 
             # Small delay to prevent CPU spinning
             time.sleep(0.001)
