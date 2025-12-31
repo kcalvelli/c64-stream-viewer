@@ -15,6 +15,7 @@
           numpy
           pygame
           opencv4
+          pyaudio
         ]);
 
         # Main A/V viewer script

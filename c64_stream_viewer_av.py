@@ -16,6 +16,12 @@ import threading
 import queue
 import os
 
+try:
+    import pyaudio
+    PYAUDIO_AVAILABLE = True
+except ImportError:
+    PYAUDIO_AVAILABLE = False
+
 # Constants from c64-protocol.h
 VIDEO_PACKET_SIZE = 780
 VIDEO_HEADER_SIZE = 12
@@ -160,27 +166,37 @@ class C64FrameAssembler:
 
 
 class AudioPlayer:
-    """Handles audio playback with buffering"""
+    """Handles audio playback with buffering using PyAudio"""
 
     def __init__(self):
-        # Try to use 48000 Hz (close to 47976) which is more commonly supported
-        # pygame/SDL will handle resampling from 48kHz to whatever the hardware supports
-        USE_SAMPLE_RATE = 48000  # Standard rate instead of 47976
-
-        # Initialize pygame mixer for audio
-        pygame.mixer.quit()  # Ensure clean state
-        pygame.mixer.init(frequency=USE_SAMPLE_RATE, size=-16,
-                         channels=2, buffer=1024)
-
-        actual_freq = pygame.mixer.get_init()[0]
-        print(f"Audio initialized: requested {USE_SAMPLE_RATE} Hz, got {actual_freq} Hz")
-
         self.audio_queue = queue.Queue(maxsize=20)
         self.running = True
+        self.packets_played = 0
+
+        if PYAUDIO_AVAILABLE:
+            # Use PyAudio for better sample rate handling
+            self.use_pyaudio = True
+            self.pa = pyaudio.PyAudio()
+
+            # Open audio stream with exact Ultimate64 sample rate
+            self.stream = self.pa.open(
+                format=pyaudio.paInt16,
+                channels=2,
+                rate=AUDIO_SAMPLE_RATE,  # Use exact 47976 Hz
+                output=True,
+                frames_per_buffer=192  # Exact packet size
+            )
+            print(f"Audio initialized (PyAudio): {AUDIO_SAMPLE_RATE} Hz, 16-bit stereo")
+        else:
+            # Fallback to pygame
+            self.use_pyaudio = False
+            pygame.mixer.quit()
+            pygame.mixer.init(frequency=AUDIO_SAMPLE_RATE, size=-16,
+                             channels=2, buffer=1024)
+            print(f"Audio initialized (pygame): {AUDIO_SAMPLE_RATE} Hz, 16-bit stereo")
+
         self.thread = threading.Thread(target=self._play_audio, daemon=True)
         self.thread.start()
-        self.packets_played = 0
-        self.use_sample_rate = USE_SAMPLE_RATE
 
     def add_audio_packet(self, audio_data):
         """Add audio packet to playback queue"""
@@ -191,38 +207,43 @@ class AudioPlayer:
 
     def _play_audio(self):
         """Audio playback thread"""
+        if self.use_pyaudio:
+            self._play_audio_pyaudio()
+        else:
+            self._play_audio_pygame()
+
+    def _play_audio_pyaudio(self):
+        """PyAudio playback (better for unusual sample rates)"""
+        while self.running:
+            try:
+                audio_data = self.audio_queue.get(timeout=0.1)
+                # Audio data is already in correct format: 768 bytes, 16-bit LE stereo
+                # Just write it directly to the stream
+                self.stream.write(audio_data)
+                self.packets_played += 1
+
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"Audio playback error: {e}")
+
+    def _play_audio_pygame(self):
+        """Pygame fallback playback"""
         channel = pygame.mixer.Channel(0)
 
         while self.running:
             try:
                 audio_data = self.audio_queue.get(timeout=0.1)
 
-                # Convert to numpy array
-                # Audio data is 768 bytes = 192 stereo samples (16-bit little-endian)
-                audio_array = np.frombuffer(audio_data, dtype='<i2')  # little-endian int16
-
-                # Resample from 47976 Hz to 48000 Hz if needed
-                if self.use_sample_rate != AUDIO_SAMPLE_RATE:
-                    # Simple linear interpolation resampling
-                    num_samples = len(audio_array)
-                    ratio = self.use_sample_rate / AUDIO_SAMPLE_RATE
-                    new_length = int(num_samples * ratio)
-
-                    # Ensure even number for stereo
-                    if new_length % 2 != 0:
-                        new_length += 1
-
-                    indices = np.linspace(0, num_samples - 1, new_length)
-                    audio_array = np.interp(indices, np.arange(num_samples), audio_array).astype(np.int16)
-
-                # Reshape to stereo (N x 2)
+                # Convert to numpy array (16-bit little-endian stereo)
+                audio_array = np.frombuffer(audio_data, dtype='<i2')
                 audio_stereo = audio_array.reshape(-1, 2)
 
                 # Create and play sound
                 sound = pygame.sndarray.make_sound(audio_stereo)
                 channel.play(sound)
 
-                # Wait for playback to finish to maintain timing
+                # Wait for playback to finish
                 while channel.get_busy() and self.running:
                     time.sleep(0.001)
 
@@ -237,7 +258,13 @@ class AudioPlayer:
         """Stop audio playback"""
         self.running = False
         self.thread.join(timeout=1.0)
-        pygame.mixer.quit()
+
+        if self.use_pyaudio:
+            self.stream.stop_stream()
+            self.stream.close()
+            self.pa.terminate()
+        else:
+            pygame.mixer.quit()
 
 
 def main():
