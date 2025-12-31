@@ -172,12 +172,41 @@ class AudioPlayer:
         self.thread.start()
         self.packets_played = 0
 
+        # DC offset removal state (per channel)
+        self.dc_filter_state = np.array([0.0, 0.0], dtype=np.float32)
+
     def add_audio_packet(self, audio_data):
         """Add audio packet to playback queue"""
         try:
             self.audio_queue.put_nowait(audio_data)
         except queue.Full:
             pass  # Drop packet if buffer full
+
+    def _remove_dc_offset(self, audio_array):
+        """
+        Remove DC offset using a first-order high-pass filter (DC blocker)
+        This eliminates hum and low-frequency noise
+        """
+        # DC blocker coefficient (higher = more aggressive, 0.995 is standard)
+        alpha = 0.995
+
+        # Reshape to stereo (192 samples x 2 channels)
+        stereo = audio_array.reshape(-1, 2)
+        filtered = np.zeros_like(stereo, dtype=np.float32)
+
+        for i in range(len(stereo)):
+            for ch in range(2):
+                # DC blocker: y[n] = x[n] - x[n-1] + alpha * y[n-1]
+                sample = float(stereo[i, ch])
+                filtered[i, ch] = sample - self.dc_filter_state[ch]
+                if i > 0:
+                    filtered[i, ch] += alpha * filtered[i-1, ch]
+
+            # Store last input sample for next packet
+            self.dc_filter_state = stereo[-1].astype(np.float32)
+
+        # Convert back to int16
+        return np.clip(filtered, -32768, 32767).astype(np.int16)
 
     def _play_audio(self):
         """Audio playback thread"""
@@ -191,8 +220,11 @@ class AudioPlayer:
                 # Audio data is 768 bytes = 384 int16 samples (192 stereo pairs)
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
 
-                # Create pygame Sound from array
-                sound = pygame.sndarray.make_sound(audio_array.reshape(-1, 2))
+                # Remove DC offset and low-frequency hum
+                filtered_array = self._remove_dc_offset(audio_array)
+
+                # Create pygame Sound from filtered array
+                sound = pygame.sndarray.make_sound(filtered_array)
 
                 # Play sound (will wait if previous sound still playing)
                 channel.play(sound)
