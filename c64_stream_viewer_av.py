@@ -164,16 +164,14 @@ class AudioPlayer:
 
     def __init__(self):
         # Initialize pygame mixer for audio
+        # Note: pygame requires buffer size that's a power of 2
         pygame.mixer.init(frequency=AUDIO_SAMPLE_RATE, size=AUDIO_FORMAT,
-                         channels=AUDIO_CHANNELS, buffer=2048)
+                         channels=AUDIO_CHANNELS, buffer=512)
         self.audio_queue = queue.Queue(maxsize=20)  # Buffer up to 20 packets (80ms)
         self.running = True
         self.thread = threading.Thread(target=self._play_audio, daemon=True)
         self.thread.start()
         self.packets_played = 0
-
-        # DC offset removal state (per channel)
-        self.dc_filter_state = np.array([0.0, 0.0], dtype=np.float32)
 
     def add_audio_packet(self, audio_data):
         """Add audio packet to playback queue"""
@@ -182,35 +180,12 @@ class AudioPlayer:
         except queue.Full:
             pass  # Drop packet if buffer full
 
-    def _remove_dc_offset(self, audio_array):
-        """
-        Remove DC offset using a first-order high-pass filter (DC blocker)
-        This eliminates hum and low-frequency noise
-        """
-        # DC blocker coefficient (higher = more aggressive, 0.995 is standard)
-        alpha = 0.995
-
-        # Reshape to stereo (192 samples x 2 channels)
-        stereo = audio_array.reshape(-1, 2)
-        filtered = np.zeros_like(stereo, dtype=np.float32)
-
-        for i in range(len(stereo)):
-            for ch in range(2):
-                # DC blocker: y[n] = x[n] - x[n-1] + alpha * y[n-1]
-                sample = float(stereo[i, ch])
-                filtered[i, ch] = sample - self.dc_filter_state[ch]
-                if i > 0:
-                    filtered[i, ch] += alpha * filtered[i-1, ch]
-
-            # Store last input sample for next packet
-            self.dc_filter_state = stereo[-1].astype(np.float32)
-
-        # Convert back to int16
-        return np.clip(filtered, -32768, 32767).astype(np.int16)
-
     def _play_audio(self):
         """Audio playback thread"""
-        channel = pygame.mixer.Channel(0)
+        # Use multiple channels to prevent gaps
+        num_channels = 4
+        channels = [pygame.mixer.Channel(i) for i in range(num_channels)]
+        current_channel = 0
 
         while self.running:
             try:
@@ -218,18 +193,19 @@ class AudioPlayer:
 
                 # Convert to numpy array for pygame
                 # Audio data is 768 bytes = 384 int16 samples (192 stereo pairs)
+                # Format: 16-bit signed little-endian, interleaved stereo
                 audio_array = np.frombuffer(audio_data, dtype=np.int16)
 
-                # Remove DC offset and low-frequency hum
-                filtered_array = self._remove_dc_offset(audio_array)
+                # Reshape to stereo format (192 samples x 2 channels)
+                audio_stereo = audio_array.reshape(-1, 2)
 
-                # Create pygame Sound from filtered array
-                sound = pygame.sndarray.make_sound(filtered_array)
+                # Create pygame Sound from array
+                sound = pygame.sndarray.make_sound(audio_stereo)
 
-                # Play sound (will wait if previous sound still playing)
+                # Play on next available channel (round-robin)
+                channel = channels[current_channel]
                 channel.play(sound)
-                while channel.get_busy() and self.running:
-                    time.sleep(0.001)
+                current_channel = (current_channel + 1) % num_channels
 
                 self.packets_played += 1
 
