@@ -2,53 +2,11 @@
 
 ## Installation
 
-### Option 1: No Installation (Run Directly from GitHub)
+### Option 1: NixOS System Installation (Recommended)
 
-```bash
-# Complete A/V viewer (video + audio)
-nix run github:kcalvelli/c64-stream-viewer#av
+Add as a flake input to your NixOS system configuration.
 
-# Video only
-nix run github:kcalvelli/c64-stream-viewer#video
-
-# Headless (stats only)
-nix run github:kcalvelli/c64-stream-viewer#headless -- --headless
-
-# Save frames to disk
-nix run github:kcalvelli/c64-stream-viewer#headless -- --save-frames /tmp/frames
-```
-
-### Option 2: Install to User Profile
-
-```bash
-# Install the A/V viewer
-nix profile install github:kcalvelli/c64-stream-viewer#av
-
-# Run from anywhere
-c64-stream-viewer-av
-
-# Or install all variants
-nix profile install github:kcalvelli/c64-stream-viewer#video
-nix profile install github:kcalvelli/c64-stream-viewer#headless
-```
-
-### Option 3: NixOS System Installation
-
-Add to `/etc/nixos/configuration.nix`:
-
-```nix
-{
-  # Method A: Using fetchGit (non-flake)
-  environment.systemPackages = [
-    (pkgs.callPackage (builtins.fetchGit {
-      url = "https://github.com/kcalvelli/c64-stream-viewer";
-      ref = "main";
-    }) {}).default
-  ];
-}
-```
-
-Or with flakes enabled:
+**Step 1:** Add to your system `flake.nix`:
 
 ```nix
 {
@@ -65,7 +23,7 @@ Or with flakes enabled:
         {
           environment.systemPackages = [
             c64-stream-viewer.packages.x86_64-linux.av
-            # Or add all variants:
+            # Optional: Add other variants
             # c64-stream-viewer.packages.x86_64-linux.video
             # c64-stream-viewer.packages.x86_64-linux.headless
           ];
@@ -74,6 +32,36 @@ Or with flakes enabled:
     };
   };
 }
+```
+
+**Step 2:** Rebuild your system:
+
+```bash
+sudo nixos-rebuild switch --flake .#yourhostname
+```
+
+**Step 3:** Run from anywhere:
+
+```bash
+c64-stream-viewer-av
+```
+
+### Option 2: Run Directly from GitHub (No Installation)
+
+Perfect for trying out the viewer without committing to an installation:
+
+```bash
+# Complete A/V viewer (video + audio)
+nix run github:kcalvelli/c64-stream-viewer#av
+
+# Video only
+nix run github:kcalvelli/c64-stream-viewer#video
+
+# Headless (stats only)
+nix run github:kcalvelli/c64-stream-viewer#headless -- --headless
+
+# Save frames to disk
+nix run github:kcalvelli/c64-stream-viewer#headless -- --save-frames /tmp/frames
 ```
 
 ## Running the Viewers

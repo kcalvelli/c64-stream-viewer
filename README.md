@@ -13,16 +13,58 @@ Wayland-native video viewer for Ultimate64 video streaming. Decodes the propriet
 
 ## Quick Start
 
-### Using Nix Flakes (Recommended)
+### NixOS System Installation (Recommended)
 
-**Run directly from GitHub (no clone needed):**
+Add as a flake input to your NixOS configuration. In your `flake.nix`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    c64-stream-viewer.url = "github:kcalvelli/c64-stream-viewer";
+  };
+
+  outputs = { self, nixpkgs, c64-stream-viewer }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        {
+          environment.systemPackages = [
+            c64-stream-viewer.packages.x86_64-linux.av
+            # Optional: Add other variants
+            # c64-stream-viewer.packages.x86_64-linux.video
+            # c64-stream-viewer.packages.x86_64-linux.headless
+          ];
+        }
+      ];
+    };
+  };
+}
+```
+
+Then rebuild your system:
+```bash
+sudo nixos-rebuild switch --flake .#yourhostname
+```
+
+After installation, run from anywhere:
+```bash
+c64-stream-viewer-av
+```
+
+### Run Directly from GitHub (No Installation)
+
+**Try it out without installing:**
 ```bash
 nix run github:kcalvelli/c64-stream-viewer#av            # Complete A/V viewer
 nix run github:kcalvelli/c64-stream-viewer#video         # Video only
 nix run github:kcalvelli/c64-stream-viewer#headless      # Headless mode
 ```
 
-**Or run from cloned repository:**
+### Development
+
+**Run from cloned repository:**
 ```bash
 cd ~/Projects/c64-stream-viewer
 nix run .#av            # Complete A/V viewer
@@ -36,61 +78,11 @@ nix develop
 python c64_stream_viewer_av.py
 ```
 
-### Using Traditional Nix Shell
+### Alternative: Traditional Nix Shell
 
 ```bash
 nix-shell shell.nix
 python c64_stream_viewer_av.py
-```
-
-### NixOS System Integration
-
-Add to your NixOS `configuration.nix`:
-
-```nix
-{
-  # Add to system packages
-  environment.systemPackages = [
-    (pkgs.callPackage (builtins.fetchGit {
-      url = "https://github.com/kcalvelli/c64-stream-viewer";
-      ref = "main";
-    }) {}).default
-  ];
-}
-```
-
-Or use with flakes in `configuration.nix`:
-
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    c64-stream-viewer.url = "github:kcalvelli/c64-stream-viewer";
-  };
-
-  outputs = { self, nixpkgs, c64-stream-viewer }: {
-    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        {
-          environment.systemPackages = [
-            c64-stream-viewer.packages.x86_64-linux.av
-          ];
-        }
-      ];
-    };
-  };
-}
-```
-
-### User Profile Installation
-
-```bash
-# Install to user profile
-nix profile install github:kcalvelli/c64-stream-viewer#av
-
-# Then run from anywhere
-c64-stream-viewer-av
 ```
 
 ## Viewers
