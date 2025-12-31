@@ -89,11 +89,9 @@ python c64_stream_viewer_av.py
 
 ### 1. Complete A/V Viewer (Recommended)
 ```bash
-# With automatic stream management
-nix run .#av -- --ultimate-host 192.168.68.140
-
+nix run .#av
 # or in dev shell:
-python c64_stream_viewer_av.py --ultimate-host 192.168.68.140
+python c64_stream_viewer_av.py
 ```
 
 **Controls:**
@@ -104,17 +102,12 @@ python c64_stream_viewer_av.py --ultimate-host 192.168.68.140
 **Options:**
 ```bash
 python c64_stream_viewer_av.py --help
-  --ultimate-host HOST Ultimate64 IP (enables auto stream start/stop)
-  --local-ip IP        Local IP to receive stream (default: 192.168.68.62)
   --video-port PORT    Video UDP port (default: 11000)
   --audio-port PORT    Audio UDP port (default: 11001)
   --scale N            Display scale factor (default: 2)
   --fullscreen         Start in fullscreen
   --no-audio           Disable audio
-  --no-auto-stream     Don't auto-start/stop streams
 ```
-
-**Key Feature:** When you provide `--ultimate-host`, the viewer automatically starts the video and audio streams on your Ultimate64 when it launches, and stops them when you exit. This makes it a true "one command" solution!
 
 ### 2. Video-Only Viewer
 ```bash

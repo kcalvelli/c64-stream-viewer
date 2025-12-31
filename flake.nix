@@ -15,7 +15,6 @@
           numpy
           pygame
           opencv4
-          requests
         ]);
 
         # Main A/V viewer script

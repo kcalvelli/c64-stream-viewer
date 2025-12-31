@@ -145,14 +145,12 @@ python c64_stream_viewer_av.py
 python c64_stream_viewer_av.py [options]
 
 Options:
-  --ultimate-host HOST Ultimate64 IP (enables auto stream start/stop)
-  --local-ip IP        Local IP to receive stream (default: 192.168.68.62)
   --video-port PORT    Video UDP port (default: 11000)
   --audio-port PORT    Audio UDP port (default: 11001)
   --scale N            Display scale (default: 2)
   --fullscreen         Start fullscreen
   --no-audio           Disable audio
-  --no-auto-stream     Don't auto-start/stop streams
+  --local-ip IP        Local IP for stream (default: 192.168.68.62)
 ```
 
 ### Video-Only Viewer
@@ -180,26 +178,16 @@ Options:
 
 ## Examples
 
-### Basic Usage with Auto Stream Management
+### Basic Usage
 ```bash
-# Complete solution - automatically starts/stops streams
-nix run .#av -- --ultimate-host 192.168.68.140
+# Just watch the stream
+nix run .#av
 
-# With custom scale
-nix run .#av -- --ultimate-host 192.168.68.140 --scale 3
+# Watch at 3x scale
+nix run .#av -- --scale 3
 
 # Fullscreen mode
-nix run .#av -- --ultimate-host 192.168.68.140 --fullscreen
-
-# Use environment variable for convenience
-export C64_HOST=192.168.68.140
-nix run .#av -- --ultimate-host $C64_HOST
-```
-
-### Manual Stream Management
-```bash
-# If you've already started streams manually, just run the viewer
-nix run .#av
+nix run .#av -- --fullscreen
 
 # Video only, no audio
 nix run .#video

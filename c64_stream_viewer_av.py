@@ -14,7 +14,6 @@ import time
 import argparse
 import threading
 import queue
-import requests
 
 # Constants from c64-protocol.h
 VIDEO_PACKET_SIZE = 780
@@ -45,46 +44,6 @@ VIC_COLORS_RGB = []
 for bgra in VIC_COLORS_BGRA:
     r, g, b = bgra & 0xFF, (bgra >> 8) & 0xFF, (bgra >> 16) & 0xFF
     VIC_COLORS_RGB.append((r, g, b))
-
-
-def start_ultimate64_stream(ultimate_host, stream_type, local_ip, port):
-    """Start a stream on the Ultimate64"""
-    try:
-        url = f"http://{ultimate_host}/v1/stream/{stream_type}/start?ip={local_ip}:{port}"
-        print(f"Starting {stream_type} stream to {local_ip}:{port}...", end='', flush=True)
-        response = requests.post(url, timeout=30)  # Ultimate64 API can be very slow
-        if response.status_code == 200 or response.status_code == 204:
-            print(" OK")
-            return True
-        else:
-            print(f" Failed (HTTP {response.status_code})")
-            return False
-    except requests.exceptions.Timeout:
-        print(" Timeout (stream may still have started)")
-        return True  # Assume success, stream might be running
-    except Exception as e:
-        print(f" Error: {e}")
-        return False
-
-
-def stop_ultimate64_stream(ultimate_host, stream_type):
-    """Stop a stream on the Ultimate64"""
-    try:
-        url = f"http://{ultimate_host}/v1/stream/{stream_type}/stop"
-        print(f"Stopping {stream_type} stream...", end='', flush=True)
-        response = requests.post(url, timeout=30)  # Ultimate64 API can be slow
-        if response.status_code == 200 or response.status_code == 204:
-            print(" OK")
-            return True
-        else:
-            print(f" Failed (HTTP {response.status_code})")
-            return False
-    except requests.exceptions.Timeout:
-        print(" Timeout")
-        return True  # Assume it worked
-    except Exception as e:
-        print(f" Error: {e}")
-        return False
 
 
 class C64FrameAssembler:
@@ -197,8 +156,6 @@ class AudioPlayer:
 
 def main():
     parser = argparse.ArgumentParser(description='C64 Ultimate64 A/V Stream Viewer (Wayland Native)')
-    parser.add_argument('--ultimate-host', type=str,
-                       help='Ultimate64 hostname or IP (e.g., 192.168.68.140). If provided, streams will be started/stopped automatically.')
     parser.add_argument('--local-ip', type=str, default='192.168.68.62',
                        help='Local IP address to receive stream (default: 192.168.68.62)')
     parser.add_argument('--video-port', type=int, default=11000,
@@ -211,27 +168,13 @@ def main():
                        help='Run in fullscreen mode')
     parser.add_argument('--no-audio', action='store_true',
                        help='Disable audio playback')
-    parser.add_argument('--no-auto-stream', action='store_true',
-                       help='Do not automatically start/stop Ultimate64 streams')
     args = parser.parse_args()
 
     print("C64 Stream Viewer - Audio/Video (Wayland Native)")
-    if args.ultimate_host:
-        print(f"Ultimate64: {args.ultimate_host}")
     print(f"Video: UDP port {args.video_port}")
     print(f"Audio: UDP port {args.audio_port}" + (" (disabled)" if args.no_audio else ""))
     print("Controls: ESC/Q=Quit, F=Fullscreen, M=Mute")
     print()
-
-    # Start streams on Ultimate64 if host provided
-    streams_started = False
-    if args.ultimate_host and not args.no_auto_stream:
-        video_started = start_ultimate64_stream(args.ultimate_host, 'video', args.local_ip, args.video_port)
-        audio_started = False
-        if not args.no_audio:
-            audio_started = start_ultimate64_stream(args.ultimate_host, 'audio', args.local_ip, args.audio_port)
-        streams_started = video_started or audio_started
-        print()
 
     # Initialize pygame
     pygame.init()
@@ -398,13 +341,6 @@ def main():
         if audio_sock:
             audio_sock.close()
         pygame.quit()
-
-        # Stop streams on Ultimate64 if we started them
-        if args.ultimate_host and not args.no_auto_stream and streams_started:
-            print()
-            stop_ultimate64_stream(args.ultimate_host, 'video')
-            if not args.no_audio:
-                stop_ultimate64_stream(args.ultimate_host, 'audio')
 
     return 0
 
