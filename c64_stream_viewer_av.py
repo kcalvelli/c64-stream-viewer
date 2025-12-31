@@ -8,7 +8,6 @@ import socket
 import struct
 import numpy as np
 import pygame
-import signal
 import sys
 import time
 import argparse
@@ -35,22 +34,14 @@ NTSC_HEIGHT = 240
 
 # Audio constants
 AUDIO_SAMPLE_RATE = 47976  # C64 Ultimate exact sample rate
-AUDIO_SAMPLES_PER_PACKET = 192
-AUDIO_CHANNELS = 2  # Stereo
-AUDIO_FORMAT = -16  # 16-bit signed
 
 # VIC-II color palette (RGB tuples)
-VIC_COLORS_BGRA = [
-    0xFF000000, 0xFFEFEFEF, 0xFF342F8D, 0xFFCDD46A,
-    0xFFA43598, 0xFF42B44C, 0xFFB1292C, 0xFF5DEFEF,
-    0xFF204E98, 0xFF00385B, 0xFF6D67D1, 0xFF4A4A4A,
-    0xFF7B7B7B, 0xFF93EF9F, 0xFFEF6A6D, 0xFFB2B2B2
+VIC_COLORS_RGB = [
+    (0x00, 0x00, 0x00), (0xEF, 0xEF, 0xEF), (0x8D, 0x2F, 0x34), (0x6A, 0xD4, 0xCD),
+    (0x98, 0x35, 0xA4), (0x4C, 0xB4, 0x42), (0x2C, 0x29, 0xB1), (0xEF, 0xEF, 0x5D),
+    (0x98, 0x4E, 0x20), (0x5B, 0x38, 0x00), (0xD1, 0x67, 0x6D), (0x4A, 0x4A, 0x4A),
+    (0x7B, 0x7B, 0x7B), (0x9F, 0xEF, 0x93), (0x6D, 0x6A, 0xEF), (0xB2, 0xB2, 0xB2)
 ]
-
-VIC_COLORS_RGB = []
-for bgra in VIC_COLORS_BGRA:
-    r, g, b = bgra & 0xFF, (bgra >> 8) & 0xFF, (bgra >> 16) & 0xFF
-    VIC_COLORS_RGB.append((r, g, b))
 
 
 def send_ultimate64_stream_command(ultimate_host, stream_id, enable, local_ip, port):
@@ -397,12 +388,7 @@ def main():
                                 )
                     elif event.key == pygame.K_m and audio_player:
                         audio_muted = not audio_muted
-                        if audio_muted:
-                            pygame.mixer.pause()
-                            print("Audio muted")
-                        else:
-                            pygame.mixer.unpause()
-                            print("Audio unmuted")
+                        print("Audio muted" if audio_muted else "Audio unmuted")
 
             # Receive video packets - drain the socket buffer
             video_packets_processed = 0

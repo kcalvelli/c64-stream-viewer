@@ -8,7 +8,6 @@ import socket
 import struct
 import numpy as np
 import pygame
-import signal
 import sys
 import time
 import argparse
@@ -23,32 +22,12 @@ PAL_HEIGHT = 272
 NTSC_HEIGHT = 240
 
 # VIC-II color palette (RGB tuples)
-VIC_COLORS_BGRA = [
-    0xFF000000,  # 0: Black
-    0xFFEFEFEF,  # 1: White
-    0xFF342F8D,  # 2: Red
-    0xFFCDD46A,  # 3: Cyan
-    0xFFA43598,  # 4: Purple/Magenta
-    0xFF42B44C,  # 5: Green
-    0xFFB1292C,  # 6: Blue
-    0xFF5DEFEF,  # 7: Yellow
-    0xFF204E98,  # 8: Orange
-    0xFF00385B,  # 9: Brown
-    0xFF6D67D1,  # 10: Light Red
-    0xFF4A4A4A,  # 11: Dark Grey
-    0xFF7B7B7B,  # 12: Mid Grey
-    0xFF93EF9F,  # 13: Light Green
-    0xFFEF6A6D,  # 14: Light Blue
-    0xFFB2B2B2   # 15: Light Grey
+VIC_COLORS_RGB = [
+    (0x00, 0x00, 0x00), (0xEF, 0xEF, 0xEF), (0x8D, 0x2F, 0x34), (0x6A, 0xD4, 0xCD),
+    (0x98, 0x35, 0xA4), (0x4C, 0xB4, 0x42), (0x2C, 0x29, 0xB1), (0xEF, 0xEF, 0x5D),
+    (0x98, 0x4E, 0x20), (0x5B, 0x38, 0x00), (0xD1, 0x67, 0x6D), (0x4A, 0x4A, 0x4A),
+    (0x7B, 0x7B, 0x7B), (0x9F, 0xEF, 0x93), (0x6D, 0x6A, 0xEF), (0xB2, 0xB2, 0xB2)
 ]
-
-# Convert BGRA to RGB tuples for pygame
-VIC_COLORS_RGB = []
-for bgra in VIC_COLORS_BGRA:
-    r = bgra & 0xFF
-    g = (bgra >> 8) & 0xFF
-    b = (bgra >> 16) & 0xFF
-    VIC_COLORS_RGB.append((r, g, b))
 
 
 class C64FrameAssembler:
