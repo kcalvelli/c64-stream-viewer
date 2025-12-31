@@ -14,6 +14,7 @@ import time
 import argparse
 import threading
 import queue
+import os
 
 # Constants from c64-protocol.h
 VIDEO_PACKET_SIZE = 780
@@ -44,6 +45,64 @@ VIC_COLORS_RGB = []
 for bgra in VIC_COLORS_BGRA:
     r, g, b = bgra & 0xFF, (bgra >> 8) & 0xFF, (bgra >> 16) & 0xFF
     VIC_COLORS_RGB.append((r, g, b))
+
+
+def send_ultimate64_stream_command(ultimate_host, stream_id, enable, local_ip, port):
+    """
+    Send stream control command to Ultimate64 via TCP command port (port 64)
+    Based on c64stream OBS plugin protocol
+
+    Args:
+        ultimate_host: Ultimate64 IP address
+        stream_id: 0 for video, 1 for audio
+        enable: True to start stream, False to stop
+        local_ip: IP address to send stream to
+        port: UDP port to send stream to
+    """
+    COMMAND_PORT = 64
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2.0)
+        sock.connect((ultimate_host, COMMAND_PORT))
+
+        if enable:
+            # Start stream command
+            ip_port_str = f"{local_ip}:{port}"
+            ip_port_bytes = ip_port_str.encode('ascii')
+            param_len = 2 + len(ip_port_bytes)  # 2 bytes duration + IP:PORT string
+
+            cmd = bytearray()
+            cmd.append(0x20 + stream_id)  # 0x20 for video, 0x21 for audio
+            cmd.append(0xFF)
+            cmd.append(param_len & 0xFF)
+            cmd.append((param_len >> 8) & 0xFF)
+            cmd.append(0x00)  # Duration: 0x0000 = forever (little endian)
+            cmd.append(0x00)
+            cmd.extend(ip_port_bytes)
+        else:
+            # Stop stream command
+            cmd = bytearray()
+            cmd.append(0x30 + stream_id)  # 0x30 for video, 0x31 for audio
+            cmd.append(0xFF)
+            cmd.append(0x00)  # No parameters
+            cmd.append(0x00)
+
+        sent = sock.send(cmd)
+        if sent != len(cmd):
+            print(f"Warning: Only sent {sent}/{len(cmd)} bytes")
+            sock.close()
+            return False
+
+        sock.close()
+        return True
+
+    except socket.timeout:
+        print(f"Error: Timeout connecting to Ultimate64 command port")
+        return False
+    except Exception as e:
+        print(f"Error sending stream command: {e}")
+        return False
 
 
 class C64FrameAssembler:
@@ -156,6 +215,8 @@ class AudioPlayer:
 
 def main():
     parser = argparse.ArgumentParser(description='C64 Ultimate64 A/V Stream Viewer (Wayland Native)')
+    parser.add_argument('--ultimate-host', type=str,
+                       help='Ultimate64 hostname or IP (default: from C64_HOST env var)')
     parser.add_argument('--local-ip', type=str, default='192.168.68.62',
                        help='Local IP address to receive stream (default: 192.168.68.62)')
     parser.add_argument('--video-port', type=int, default=11000,
@@ -168,13 +229,43 @@ def main():
                        help='Run in fullscreen mode')
     parser.add_argument('--no-audio', action='store_true',
                        help='Disable audio playback')
+    parser.add_argument('--no-auto-stream', action='store_true',
+                       help='Do not automatically start/stop streams')
     args = parser.parse_args()
 
+    # Get Ultimate64 host from argument or environment
+    ultimate_host = args.ultimate_host or os.environ.get('C64_HOST')
+
     print("C64 Stream Viewer - Audio/Video (Wayland Native)")
+    if ultimate_host:
+        print(f"Ultimate64: {ultimate_host}")
     print(f"Video: UDP port {args.video_port}")
     print(f"Audio: UDP port {args.audio_port}" + (" (disabled)" if args.no_audio else ""))
     print("Controls: ESC/Q=Quit, F=Fullscreen, M=Mute")
     print()
+
+    # Start streams if Ultimate64 host is provided
+    streams_started = False
+    if ultimate_host and not args.no_auto_stream:
+        print("Starting streams...")
+        video_started = send_ultimate64_stream_command(ultimate_host, 0, True, args.local_ip, args.video_port)
+        audio_started = False
+        if not args.no_audio:
+            audio_started = send_ultimate64_stream_command(ultimate_host, 1, True, args.local_ip, args.audio_port)
+
+        if video_started:
+            print(f"✓ Video stream started (→ {args.local_ip}:{args.video_port})")
+        else:
+            print(f"✗ Failed to start video stream")
+
+        if not args.no_audio:
+            if audio_started:
+                print(f"✓ Audio stream started (→ {args.local_ip}:{args.audio_port})")
+            else:
+                print(f"✗ Failed to start audio stream")
+
+        streams_started = video_started or audio_started
+        print()
 
     # Initialize pygame
     pygame.init()
@@ -341,6 +432,15 @@ def main():
         if audio_sock:
             audio_sock.close()
         pygame.quit()
+
+        # Stop streams if we started them
+        if ultimate_host and not args.no_auto_stream and streams_started:
+            print("\nStopping streams...")
+            if send_ultimate64_stream_command(ultimate_host, 0, False, args.local_ip, args.video_port):
+                print("✓ Video stream stopped")
+            if not args.no_audio:
+                if send_ultimate64_stream_command(ultimate_host, 1, False, args.local_ip, args.audio_port):
+                    print("✓ Audio stream stopped")
 
     return 0
 
