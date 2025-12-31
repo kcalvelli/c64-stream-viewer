@@ -2,15 +2,103 @@
 
 ## Installation
 
+### Option 1: No Installation (Run Directly from GitHub)
+
 ```bash
-cd ~/Projects/c64-stream-viewer
+# Complete A/V viewer (video + audio)
+nix run github:kcalvelli/c64-stream-viewer#av
+
+# Video only
+nix run github:kcalvelli/c64-stream-viewer#video
+
+# Headless (stats only)
+nix run github:kcalvelli/c64-stream-viewer#headless -- --headless
+
+# Save frames to disk
+nix run github:kcalvelli/c64-stream-viewer#headless -- --save-frames /tmp/frames
+```
+
+### Option 2: Install to User Profile
+
+```bash
+# Install the A/V viewer
+nix profile install github:kcalvelli/c64-stream-viewer#av
+
+# Run from anywhere
+c64-stream-viewer-av
+
+# Or install all variants
+nix profile install github:kcalvelli/c64-stream-viewer#video
+nix profile install github:kcalvelli/c64-stream-viewer#headless
+```
+
+### Option 3: NixOS System Installation
+
+Add to `/etc/nixos/configuration.nix`:
+
+```nix
+{
+  # Method A: Using fetchGit (non-flake)
+  environment.systemPackages = [
+    (pkgs.callPackage (builtins.fetchGit {
+      url = "https://github.com/kcalvelli/c64-stream-viewer";
+      ref = "main";
+    }) {}).default
+  ];
+}
+```
+
+Or with flakes enabled:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    c64-stream-viewer.url = "github:kcalvelli/c64-stream-viewer";
+  };
+
+  outputs = { self, nixpkgs, c64-stream-viewer }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        {
+          environment.systemPackages = [
+            c64-stream-viewer.packages.x86_64-linux.av
+            # Or add all variants:
+            # c64-stream-viewer.packages.x86_64-linux.video
+            # c64-stream-viewer.packages.x86_64-linux.headless
+          ];
+        }
+      ];
+    };
+  };
+}
 ```
 
 ## Running the Viewers
 
-### Option 1: Flake Apps (No Installation)
+### From GitHub (No Clone)
 
 ```bash
+# Complete A/V viewer (video + audio)
+nix run github:kcalvelli/c64-stream-viewer#av
+
+# Video only
+nix run github:kcalvelli/c64-stream-viewer#video
+
+# Headless (stats only)
+nix run github:kcalvelli/c64-stream-viewer#headless -- --headless
+
+# Save frames to disk
+nix run github:kcalvelli/c64-stream-viewer#headless -- --save-frames /tmp/frames
+```
+
+### From Cloned Repository
+
+```bash
+cd ~/Projects/c64-stream-viewer
+
 # Complete A/V viewer (video + audio)
 nix run .#av
 
@@ -24,7 +112,7 @@ nix run .#headless -- --headless
 nix run .#headless -- --save-frames /tmp/frames
 ```
 
-### Option 2: Development Shell
+### Development Shell
 
 ```bash
 # Enter dev environment
@@ -36,7 +124,7 @@ python c64_stream_viewer_wayland.py
 python c64_stream_viewer.py --headless
 ```
 
-### Option 3: Traditional Nix Shell
+### Traditional Nix Shell
 
 ```bash
 nix-shell shell.nix

@@ -15,7 +15,14 @@ Wayland-native video viewer for Ultimate64 video streaming. Decodes the propriet
 
 ### Using Nix Flakes (Recommended)
 
-**Run directly:**
+**Run directly from GitHub (no clone needed):**
+```bash
+nix run github:kcalvelli/c64-stream-viewer#av            # Complete A/V viewer
+nix run github:kcalvelli/c64-stream-viewer#video         # Video only
+nix run github:kcalvelli/c64-stream-viewer#headless      # Headless mode
+```
+
+**Or run from cloned repository:**
 ```bash
 cd ~/Projects/c64-stream-viewer
 nix run .#av            # Complete A/V viewer
@@ -34,6 +41,56 @@ python c64_stream_viewer_av.py
 ```bash
 nix-shell shell.nix
 python c64_stream_viewer_av.py
+```
+
+### NixOS System Integration
+
+Add to your NixOS `configuration.nix`:
+
+```nix
+{
+  # Add to system packages
+  environment.systemPackages = [
+    (pkgs.callPackage (builtins.fetchGit {
+      url = "https://github.com/kcalvelli/c64-stream-viewer";
+      ref = "main";
+    }) {}).default
+  ];
+}
+```
+
+Or use with flakes in `configuration.nix`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    c64-stream-viewer.url = "github:kcalvelli/c64-stream-viewer";
+  };
+
+  outputs = { self, nixpkgs, c64-stream-viewer }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        {
+          environment.systemPackages = [
+            c64-stream-viewer.packages.x86_64-linux.av
+          ];
+        }
+      ];
+    };
+  };
+}
+```
+
+### User Profile Installation
+
+```bash
+# Install to user profile
+nix profile install github:kcalvelli/c64-stream-viewer#av
+
+# Then run from anywhere
+c64-stream-viewer-av
 ```
 
 ## Viewers
