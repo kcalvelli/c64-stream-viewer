@@ -18,12 +18,45 @@
           pyaudio
         ]);
 
-        # Main A/V viewer script
-        c64-stream-viewer-av = pkgs.writeScriptBin "c64-stream-viewer-av" ''
-          #!${pkgs.bash}/bin/bash
-          export SDL_VIDEODRIVER=wayland
-          exec ${pythonEnv}/bin/python ${./c64_stream_viewer_av.py} "$@"
-        '';
+        # Main A/V viewer package with desktop file
+        c64-stream-viewer-av = pkgs.stdenv.mkDerivation {
+          pname = "c64-stream-viewer-av";
+          version = "1.0.0";
+
+          src = ./.;
+
+          buildInputs = [ pythonEnv ];
+
+          installPhase = ''
+            mkdir -p $out/bin
+            mkdir -p $out/share/applications
+            mkdir -p $out/share/icons/hicolor/256x256/apps
+
+            # Create the main executable
+            cat > $out/bin/c64-stream-viewer-av <<EOF
+            #!${pkgs.bash}/bin/bash
+            export SDL_VIDEODRIVER=wayland
+            exec ${pythonEnv}/bin/python ${./c64_stream_viewer_av.py} "\$@"
+            EOF
+            chmod +x $out/bin/c64-stream-viewer-av
+
+            # Install icon
+            cp ${./commodore.png} $out/share/icons/hicolor/256x256/apps/c64-stream-viewer.png
+
+            # Create desktop file
+            cat > $out/share/applications/c64-stream-viewer-av.desktop <<EOF
+            [Desktop Entry]
+            Name=C64 Stream Viewer
+            Comment=Ultimate64 Stream Viewer - Audio/Video
+            Exec=$out/bin/c64-stream-viewer-av
+            Icon=c64-stream-viewer
+            Terminal=false
+            Type=Application
+            Categories=AudioVideo;Player;
+            Keywords=c64;commodore;ultimate64;streaming;
+            EOF
+          '';
+        };
 
         # Video-only viewer
         c64-stream-viewer = pkgs.writeScriptBin "c64-stream-viewer" ''
