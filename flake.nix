@@ -29,19 +29,23 @@
 
           installPhase = ''
             mkdir -p $out/bin
+            mkdir -p $out/share/c64-stream-viewer
             mkdir -p $out/share/applications
             mkdir -p $out/share/icons/hicolor/256x256/apps
+
+            # Copy Python script
+            cp $src/c64_stream_viewer_av.py $out/share/c64-stream-viewer/
 
             # Create the main executable
             cat > $out/bin/c64-stream-viewer-av <<EOF
             #!${pkgs.bash}/bin/bash
             export SDL_VIDEODRIVER=wayland
-            exec ${pythonEnv}/bin/python ${./c64_stream_viewer_av.py} "\$@"
+            exec ${pythonEnv}/bin/python $out/share/c64-stream-viewer/c64_stream_viewer_av.py "\$@"
             EOF
             chmod +x $out/bin/c64-stream-viewer-av
 
             # Install icon
-            cp ${./commodore.png} $out/share/icons/hicolor/256x256/apps/c64-stream-viewer.png
+            cp $src/commodore.png $out/share/icons/hicolor/256x256/apps/c64-stream-viewer.png
 
             # Create desktop file
             cat > $out/share/applications/c64-stream-viewer-av.desktop <<EOF
