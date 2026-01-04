@@ -16,6 +16,7 @@ result-*
 *.avi
 frames/
 *.png
+!commodore.png
 
 # IDE
 .vscode/

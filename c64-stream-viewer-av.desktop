@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=C64 Stream Viewer
+Comment=Ultimate64 Stream Viewer - Audio/Video
+Exec=c64-stream-viewer-av
+Icon=c64-stream-viewer
+Terminal=false
+Type=Application
+Categories=AudioVideo;Player;
+Keywords=c64;commodore;ultimate64;streaming;

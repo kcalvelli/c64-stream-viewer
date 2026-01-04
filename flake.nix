@@ -25,12 +25,28 @@
 
           src = ./.;
 
+          nativeBuildInputs = with pkgs; [
+            copyDesktopItems
+            shared-mime-info
+          ];
+
           buildInputs = [ pythonEnv ];
+
+          desktopItems = [
+            (pkgs.makeDesktopItem {
+              name = "c64-stream-viewer-av";
+              exec = "c64-stream-viewer-av";
+              icon = "c64-stream-viewer";
+              desktopName = "C64 Stream Viewer";
+              comment = "Ultimate64 Stream Viewer - Audio/Video";
+              categories = [ "AudioVideo" "Player" ];
+              keywords = [ "c64" "commodore" "ultimate64" "streaming" ];
+            })
+          ];
 
           installPhase = ''
             mkdir -p $out/bin
             mkdir -p $out/share/c64-stream-viewer
-            mkdir -p $out/share/applications
             mkdir -p $out/share/icons/hicolor/256x256/apps
 
             # Copy Python script
@@ -46,20 +62,20 @@
 
             # Install icon
             cp $src/commodore.png $out/share/icons/hicolor/256x256/apps/c64-stream-viewer.png
-
-            # Create desktop file
-            cat > $out/share/applications/c64-stream-viewer-av.desktop <<EOF
-            [Desktop Entry]
-            Name=C64 Stream Viewer
-            Comment=Ultimate64 Stream Viewer - Audio/Video
-            Exec=$out/bin/c64-stream-viewer-av
-            Icon=c64-stream-viewer
-            Terminal=false
-            Type=Application
-            Categories=AudioVideo;Player;
-            Keywords=c64;commodore;ultimate64;streaming;
-            EOF
           '';
+
+          # Ensure icon and desktop file caches are updated
+          postFixup = ''
+            ${pkgs.shared-mime-info}/bin/update-mime-database $out/share/mime || true
+          '';
+
+          meta = with pkgs.lib; {
+            description = "Wayland-native viewer for Ultimate64 video/audio streaming";
+            homepage = "https://github.com/kcalvelli/c64-stream-viewer";
+            license = licenses.mit;
+            platforms = platforms.linux;
+            mainProgram = "c64-stream-viewer-av";
+          };
         };
 
         # Video-only viewer

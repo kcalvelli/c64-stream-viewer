@@ -13,6 +13,8 @@ Wayland-native video viewer for Ultimate64 video streaming. Decodes the propriet
 
 ## Quick Start
 
+**Other Linux Distros?** See [INSTALL.md](INSTALL.md) for traditional installation instructions.
+
 ### NixOS System Installation (Recommended)
 
 Add as a flake input to your NixOS configuration. In your `flake.nix`:
