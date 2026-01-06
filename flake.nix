@@ -45,6 +45,8 @@
           ];
 
           installPhase = ''
+            runHook preInstall
+
             mkdir -p $out/bin
             mkdir -p $out/share/c64-stream-viewer
             mkdir -p $out/share/icons/hicolor/256x256/apps
@@ -62,6 +64,8 @@
 
             # Install icon
             cp $src/commodore.png $out/share/icons/hicolor/256x256/apps/c64-stream-viewer.png
+
+            runHook postInstall
           '';
 
           # Ensure icon and desktop file caches are updated
